@@ -1,119 +1,54 @@
 import kotlin.reflect.KProperty
 
 
-context (ComputingContext)
-public class DependentComputation<T> public constructor(vararg names: String, private val f: () -> T) : ComputableValue<T>(*names) {
-    internal var storedState: DependentComputationState<T> = DependentComputationState.NotInitialized(setOf(), setOf())
-    private var state: DependentComputationState<T>
-        get() = getNodeState(this) ?: storedState
-        set(value) = setNodeState(this, value)
+context (AbstractComputingContext)
+public class DependentComputation<T> public constructor(vararg names: String, private val f: () -> T) :
+    ComputableValue<T>(initialState = ComputableValueState.NotInitialized(setOf(), setOf()), *names) {
+    override fun computeResult(): Result<T> = withinStackScope { runCatching { f() } }
 
-    internal fun invalidateAllFromThis() {
-        fun <T> DependentComputation<T>.invalidateCurrent() {
-            state = state.invalidated()
+    override fun refresh()  {
+        openComputation()
+        withinStackScope {
+            invalidateAllFromThis()
         }
-
-        val visited = mutableSetOf<DependentComputation<*>>()
-        fun invalidateAllFromThisImpl(current: DependentComputation<*>) {
-            if (current in visited) return
-            visited.add(current)
-            current.invalidateCurrent()
-            for (dependent in current.state.dependents) {
-                invalidateAllFromThisImpl(dependent)
-            }
-        }
-        invalidateAllFromThisImpl(this)
-    }
-
-    override val result: Result<T>
-        get() = when (val oldState = state) {
-            is DependentComputationState.WithValue -> oldState.cachedValue.also {
-                openComputation()
-                currentNode?.let { this dependsOn it }
-                closeComputation(successfully = true) // todo history
-                // todo multi-threaded
-                // todo hide main, tests (including errors, regular exceptions, recover after failures, history)
-                // todo effective sets
-                // todo readme
-            }
-            is DependentComputationState.NotInitialized -> {
-                openComputation()
-                currentNode?.let { this dependsOn it }
-                freeDependencies()
-                val result = withinStackScope { runCatching { f() } }
-                val notCaughtExceptions = result.exceptionOrNull() as? NotCaughtException
-                if (notCaughtExceptions != null) {
-                    closeComputation(successfully = false)
-                    throw notCaughtExceptions
-                }
-                setNodeState(this, DependentComputationState.WithValue(state.dependents, state.dependencies, result))
-                if (isEager) {
-                    precommitTasks.addAll(this.state.dependents.map { dependent -> { dependent.result } })
-                }
-                closeComputation(successfully = true)
-                result
-            }
-        }
-
-    private infix fun dependsOn(dependent: DependentComputation<*>) {
-        this.state = this.state.withNewDependent(dependent)
-        @Suppress("UNCHECKED_CAST")
-        dependent.state = dependent.state.withNewDependency(dependency = this) as DependentComputationState<Nothing>
-    }
-    
-    private fun freeDependencies() {
-        for (dependency in state.dependencies) {
-            @Suppress("UNCHECKED_CAST")
-            dependency.state = dependency.state.withoutDependent(this) as DependentComputationState<Nothing>
-        }
-        state = state.withoutAllDependencies()
-    }
-
-
-    override operator fun getValue(thisRef: Any?, property: KProperty<*>): T {
-        names.add(property.name)
-        return value
+        result
+        closeComputation(successfully = true)
     }
 }
 
-public val <T> DependentComputation<T>.value: T
-    get() = result.getOrThrow()
-
-context (ComputingContext)
-public class Parameter<T> public constructor(value: T, vararg names: String) : ComputableValue<T>(*names) {
-    private var internalValue: T = value
-        set(value) {
-            if (value != field) {
-                val oldValue = field
-                field = value
-                try {
-                    openComputation()
-                    dependentComputation.invalidateAllFromThis()
-                    dependentComputation.result
-                    closeComputation(successfully = true)
-                } catch (e: NotCaughtException) {
-                    closeComputation(successfully = false)
-                    field = oldValue
-                    throw e
-                }
-            }
-        }
-    private val dependentComputation = DependentComputation { internalValue }
-    override val result: Result<T>
-        get() = dependentComputation.result
-
-    override operator fun getValue(thisRef: Any?, property: KProperty<*>): T = dependentComputation.getValue(thisRef, property)
+context (AbstractComputingContext)
+public class Parameter<T> public constructor(value: T, vararg names: String) :
+    ComputableValue<T>(initialState = ComputableValueState.WithValue(setOf(), setOf(), Result.success(value)), *names) {
+    override fun computeResult(): Result<T> = (state as ComputableValueState.WithValue<T>).cachedValue
+    
+    private fun updateValue(value: T) {
+        if (value == this.value) return
+        openComputation()
+        state = ComputableValueState.WithValue(
+            dependencies = state.dependencies,
+            dependents = state.dependents,
+            cachedValue = Result.success(value),
+        )
+        refresh()
+        closeComputation(successfully = true)
+    }
 
     public operator fun setValue(thisRef: Any?, property: KProperty<*>, value: T) {
         names.add(property.name)
-        this.internalValue = value
+        updateValue(value)
+    }
+    
+    override fun refresh()  {
+        for (dependent in state.dependents) {
+            dependent.refresh()
+        }
     }
 }
 
 public fun main() {
     fun <T> logged(name: String, x: T) = x.also { println("Computing $name: $x") }
-    
-    with(ComputingContext(isEager = true)) {
+
+    with(ComputingContext.WithHistory()) {
         val x by DependentComputation { logged("x", 2) }
         var a by Parameter(5)
         val y by DependentComputation { logged("y", x + x * a) }
@@ -121,10 +56,10 @@ public fun main() {
         println("$a $x $y $z")
         a++
         println("$a $x $y $z")
-        
+
         println()
         println()
-        
+
         var bParameter by Parameter("b")
         var cParameter by Parameter("c")
         val b by DependentComputation { logged("b", bParameter) }
@@ -145,7 +80,49 @@ public fun main() {
             val x by DependentComputation { this.y }
             val y: Int by DependentComputation { this.x }
         }
+
         val r = Recur()
         println(runCatching { r.x }.exceptionOrNull()?.message)
+        undo()
+        println("$b $c $conditional")
+        undo()
+        println("$b $c $conditional")
+        redo()
+        println("$b $c $conditional")
+        redo()
+        println("$b $c $conditional")
+
+        println()
+        println()
+
+        var x1 by Parameter("init")
+        println(x1)
+        x1 = "set"
+        println(x1)
+        undo()
+        println(x1)
+        redo()
+        println(x1)
+        undo()
+        println(x1)
+        x1 = "set"
+        println(x1)
+        
+        println()
+        println()
+       
+        val p1Delegate = DependentComputation { logged("p1", "f") }
+        val p2Delegate = Parameter("g")
+        val p1 by p1Delegate
+        val p2 by p2Delegate
+        val r1Delegate = DependentComputation { logged("r1", p1 + p2) }
+        val r1 by r1Delegate
+        println("$p1 $p2 $r1")
+        r1Delegate.refresh()
+        println("$p1 $p2 $r1")
+        p1Delegate.refresh()
+        println("$p1 $p2 $r1")
+        p2Delegate.refresh()
+        println("$p1 $p2 $r1")
     }
 }
