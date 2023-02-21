@@ -1,9 +1,10 @@
+import kotlinx.collections.immutable.persistentSetOf
 import kotlin.reflect.KProperty
 
 
 context (AbstractComputingContext)
 public class DependentComputation<T> public constructor(vararg names: String, private val f: () -> T) :
-    ComputableValue<T>(initialState = ComputableValueState.NotInitialized(setOf(), setOf()), *names) {
+    ComputableValue<T>(initialState = ComputableValueState.NotInitialized(persistentSetOf(), persistentSetOf()), *names) {
     override fun computeResult(): Result<T> = withinStackScope { runCatching { f() } }
 
     override fun refresh()  {
@@ -18,7 +19,7 @@ public class DependentComputation<T> public constructor(vararg names: String, pr
 
 context (AbstractComputingContext)
 public class Parameter<T> public constructor(value: T, vararg names: String) :
-    ComputableValue<T>(initialState = ComputableValueState.WithValue(setOf(), setOf(), Result.success(value)), *names) {
+    ComputableValue<T>(initialState = ComputableValueState.WithValue(persistentSetOf(), persistentSetOf(), Result.success(value)), *names) {
     override fun computeResult(): Result<T> = (state as ComputableValueState.WithValue<T>).cachedValue
     
     private fun updateValue(value: T) {
@@ -39,9 +40,16 @@ public class Parameter<T> public constructor(value: T, vararg names: String) :
     }
     
     override fun refresh()  {
-        for (dependent in state.dependents) {
-            dependent.refresh()
+        openComputation()
+        val newState = state
+        withinStackScope {
+            invalidateAllFromThis()
         }
+        state = newState
+        for (dependent in state.dependents) {
+            dependent.result
+        }
+        closeComputation(successfully = true)
     }
 }
 
@@ -83,6 +91,7 @@ public fun main() {
 
         val r = Recur()
         println(runCatching { r.x }.exceptionOrNull()?.message)
+        println("$b $c $conditional")
         undo()
         println("$b $c $conditional")
         undo()

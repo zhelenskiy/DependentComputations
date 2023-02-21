@@ -24,8 +24,7 @@ public abstract class ComputableValue<T> internal constructor(initialState: Comp
                 currentNode?.let { this dependsOn it }
                 closeComputation(successfully = true)
                 // todo multi-threaded when delegating context receivers will be call-site-wise
-                // todo hide main, tests (including errors, regular exceptions, recover after failures, history)
-                // todo effective sets
+                // todo hide main, tests (including errors, regular exceptions, recover after failures, history, refresh, refresh which could make refresh same node twice+)
                 // todo readme
             }
 
