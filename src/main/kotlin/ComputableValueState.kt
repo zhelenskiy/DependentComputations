@@ -24,7 +24,7 @@ internal sealed class ComputableValueState<out T> {
         override fun withoutDependent(dependent: ComputableValue<*>): ComputableValueState<Nothing> =
             copy(dependents = dependents.remove(dependent))
     }
-    data class WithValue<T> internal constructor(
+    data class WithValue<out T> internal constructor(
         override val dependents: PersistentSet<ComputableValue<*>>,
         override val dependencies: PersistentSet<ComputableValue<*>>,
         val cachedValue: Result<T>
@@ -40,3 +40,6 @@ internal sealed class ComputableValueState<out T> {
             copy(dependents = dependents.remove(dependent))
     }
 }
+
+@Suppress("UNCHECKED_CAST")
+internal val ComputableValueState<*>.casted get() = this as ComputableValueState<Nothing>

@@ -16,6 +16,7 @@ repositories {
 dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-collections-immutable:0.3.5")
     testImplementation(kotlin("test"))
+    testImplementation("org.junit.jupiter:junit-jupiter-params:5.9.2")
 }
 
 tasks.test {
@@ -27,14 +28,19 @@ kotlin {
     explicitApi = ExplicitApiMode.Strict
 }
 
-tasks.withType<KotlinCompile>().all {
-    kotlinOptions.freeCompilerArgs += "-Xcontext-receivers"
-}
-
 application {
     mainClass.set("MainKt")
 }
+
 val compileKotlin: KotlinCompile by tasks
+val compileTestKotlin: KotlinCompile by tasks
+
 compileKotlin.kotlinOptions {
     languageVersion = "1.9"
+    freeCompilerArgs += "-Xcontext-receivers"
+}
+
+compileTestKotlin.kotlinOptions {
+    languageVersion = "1.9"
+    freeCompilerArgs += "-Xcontext-receivers"
 }

@@ -1,17 +1,9 @@
-public abstract class AbstractComputingContext {
-    internal abstract fun commit()
-    internal abstract val newStates: MutableMap<ComputableValue<*>, ComputableValueState<*>>
-    internal abstract val currentNode: ComputableValue<*>?
-    internal abstract fun <T> ComputableValue<*>.withinStackScope(f: () -> T): T
-    internal abstract fun openComputation()
-    internal abstract val precommitTasks: MutableSet<ComputableValue<*>>
-    internal abstract fun closeComputation(successfully: Boolean)
-    internal abstract fun setNodeState(value: ComputableValue<*>, newState: ComputableValueState<*>)
-    internal abstract fun <T> getNodeState(value: ComputableValue<T>): ComputableValueState<T>?
-    public abstract val isEager: Boolean
-}
-
-public open class ComputingContext public constructor(public override val isEager: Boolean) : AbstractComputingContext() {
+public open class ComputationContext public constructor(public override val recomputeEagerly: Boolean) : AbstractComputationContext() {
+    override var isCausedByUserAction: Boolean = false
+        set(value) {
+            if (value) require(isInsideTransaction) { "Cannot set cause beyond transaction" }
+            field = value
+        }
     override val newStates = mutableMapOf<ComputableValue<*>, ComputableValueState<*>>()
     private var openedComputations: Long = 0L
     private val isInsideTransaction: Boolean
@@ -81,13 +73,13 @@ public open class ComputingContext public constructor(public override val isEage
                     while (precommitTasks.isNotEmpty()) {
                         val first = precommitTasks.first()
                         precommitTasks.remove(first)
-                        first.result
+                        first.result ?: throw IllegalComputationStateException("Refresh is caused by user")
                     }
                 } catch (e: NotCaughtException) {
                     closeComputation(successfully = false)
                     throw e
                 }
-                if (newStates.isNotEmpty()) {
+                if (newStates.isNotEmpty() || this.isCausedByUserAction) {
                     commit()
                 } else {
                     clear()
@@ -102,8 +94,7 @@ public open class ComputingContext public constructor(public override val isEage
 
     override fun commit() {
         for ((value, newState) in newStates) {
-            @Suppress("UNCHECKED_CAST")
-            value.storedState = newState as ComputableValueState<Nothing>
+            value.storedState = newState.casted
         }
         clear()
     }
@@ -116,6 +107,7 @@ public open class ComputingContext public constructor(public override val isEage
         precommitTasks.clear()
         newStates.clear()
         stack.clear()
+        isCausedByUserAction = false
     }
 
     override fun setNodeState(value: ComputableValue<*>, newState: ComputableValueState<*>) {
@@ -126,22 +118,30 @@ public open class ComputingContext public constructor(public override val isEage
         }
     }
     
-    @Suppress("UNCHECKED_CAST")
     override fun <T> getNodeState(value: ComputableValue<T>): ComputableValueState<T>? =
-        newStates[value] as ComputableValueState<T>?
+        newStates[value]?.casted
+
+    override val isWatchingHistory: Boolean
+        get() = false
  
-    public class WithHistory public constructor() : ComputingContext(isEager = true) {
-        
+    public class WithHistory public constructor(recomputeEagerly: Boolean = true) : ComputationContext(recomputeEagerly = recomputeEagerly) {
         
         private var index = 0
-        private class Operation(val changes: Map<ComputableValue<*>, Change>) {
+        private class Operation(val isCausedByUserAction: Boolean, val changes: Map<ComputableValue<*>, Change>) {
             data class Change(val oldState: ComputableValueState<*>, val newState: ComputableValueState<*>)
         }
         private val operations = mutableListOf<Operation>()
+        
+        override val isWatchingHistory: Boolean
+            get() = index < operations.size
+        
         override fun commit() {
-            val operation = Operation(newStates.mapValues { (value, newState) ->
-                Operation.Change(oldState = value.storedState, newState = newState)
-            })
+            val operation = Operation(
+                isCausedByUserAction = this.isCausedByUserAction,
+                changes = newStates.mapValues { (value, newState) ->
+                    Operation.Change(oldState = value.storedState, newState = newState)
+                }
+            )
             super.commit()
             while (index in operations.indices) operations.removeLast()
             operations.add(operation)
@@ -149,21 +149,34 @@ public open class ComputingContext public constructor(public override val isEage
         }
         
         public fun undo() {
-            require(index > 0) { "Nothing to undo" }
-            index--
-            for ((value, change) in operations[index].changes) {
-                @Suppress("UNCHECKED_CAST")
-                value.storedState = change.oldState as ComputableValueState<Nothing>
+            val operationsToUndo: Int? = run {
+                var result = 1
+                while (index - result >= 0 && !operations[index - result].isCausedByUserAction) result++
+                result.takeIf { index - result >= 0 }
+            }
+            require(operationsToUndo != null) { "Nothing to undo" }
+            repeat(operationsToUndo) {
+                index--
+                for ((value, change) in operations[index].changes) {
+                    value.storedState = change.oldState.casted
+                }
             }
         }
         
         public fun redo() {
-            require(index < operations.size) { "Nothing to redo" }
-            for ((value, change) in operations[index].changes) {
-                @Suppress("UNCHECKED_CAST")
-                value.storedState = change.newState as ComputableValueState<Nothing>
+            val operationsToRedo: Int? = run {
+                if (index == operations.size) return@run null
+                var result = 1
+                while (index + result < operations.size && !operations[index + result].isCausedByUserAction) result++
+                result
             }
-            index++
+            require(operationsToRedo != null) { "Nothing to redo" }
+            repeat(operationsToRedo) {
+                for ((value, change) in operations[index].changes) {
+                    value.storedState = change.newState.casted
+                }
+                index++
+            }
         }
     }
 }
