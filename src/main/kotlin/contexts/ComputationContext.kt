@@ -153,11 +153,11 @@ public open class ComputationContext public constructor(public override val reco
      * However, there is a way to rewrite history explicitly by calling [ComputableValue.refresh] or using [Parameter.setValue].
      * 
      * Singular state changes may be caused by performing some previously deferred lazy computations and
-     * using them as [WithHistory.undo]/[WithHistory.redo] unit would be misleading and inconvenient.
+     * using them as [WithHistory.undo]/[WithHistory.redo] units would be misleading and inconvenient.
      * So, [WithHistory.undo]/[WithHistory.redo] checkpoints are blocks of actions
      * that start with explicit user actions described above and include all following implicit actions before next explicit one.
      * 
-     * Even [Parameter] self-initialization causes a new checkpoint creation in history because otherwise the following [WithHistory.undo]
+     * Even [Parameter] self-initialization causes a new checkpoint creation in history because otherwise the following [WithHistory.undo] call
      * would do different actions depending on the actual set value. However, no computations are performed in this case.
      *
      * @param recomputeEagerly Initializes [ComputationContext.WithHistory.recomputeEagerly] property.

@@ -64,8 +64,6 @@ public abstract class ComputableValue<T> internal constructor(initialState: Comp
                     openComputation()
                     currentNode?.let { this dependsOn it }
                     closeComputation(successfully = true)
-                    // todo readme
-                    // todo add licence
                 }
                 oldState.cachedValue
             }
