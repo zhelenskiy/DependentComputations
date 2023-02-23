@@ -1,9 +1,27 @@
+package contexts
+
+import values.ComputableValue
+import states.ComputableValueState
+import states.casted
+import exceptions.IllegalComputationStateException
+import exceptions.NotCaughtException
+import exceptions.RecursiveComputationException
+import exceptions.NotInitializedException
+import values.Parameter
+
+/**
+ * Inheritor of [AbstractComputationContext] that does not support history operations.
+ * 
+ * @param recomputeEagerly Initializes [ComputationContext.recomputeEagerly] property.
+ * @property recomputeEagerly Implementation of [AbstractComputationContext.recomputeEagerly] property.
+ */
 public open class ComputationContext public constructor(public override val recomputeEagerly: Boolean) : AbstractComputationContext() {
     override var isCausedByUserAction: Boolean = false
         set(value) {
-            if (value) require(isInsideTransaction) { "Cannot set cause beyond transaction" }
+            if (value && !isInsideTransaction) throw IllegalComputationStateException("Cannot set cause beyond transaction")
             field = value
         }
+    
     override val newStates = mutableMapOf<ComputableValue<*>, ComputableValueState<*>>()
     private var openedComputations: Long = 0L
     private val isInsideTransaction: Boolean
@@ -13,7 +31,7 @@ public open class ComputationContext public constructor(public override val reco
         private val stack = mutableListOf<ComputableValue<*>>()
         private val stackContent = mutableListOf<ComputableValue<*>>()
 
-        @Throws(RecursiveDependencyException::class)
+        @Throws(RecursiveComputationException::class)
         fun push(element: ComputableValue<*>) {
             if (stackContent.contains(element)) {
                 val chain = buildList {
@@ -23,7 +41,7 @@ public open class ComputationContext public constructor(public override val reco
                         if (frame == element) break
                     }
                 }.asReversed()
-                throw RecursiveDependencyException(chain)
+                throw RecursiveComputationException(chain)
             }
             stack.add(element)
             stackContent.add(element)
@@ -123,7 +141,27 @@ public open class ComputationContext public constructor(public override val reco
 
     override val isWatchingHistory: Boolean
         get() = false
- 
+
+    /**
+     * Inheritor of [AbstractComputationContext] that supports history operations.
+     * 
+     * This [AbstractComputationContext] allows users to watch history by [WithHistory.undo] and [WithHistory.redo] operations.
+     * 
+     * During watching not last state it is forbidden to compute not yet initialized values as this would lead to implicit history rewriting.
+     * It is unintended, so [ComputableValue.result] returns `null` and
+     * [ComputableValue.value], [ComputableValue.getValue] fall with [NotInitializedException] in this case.
+     * However, there is a way to rewrite history explicitly by calling [ComputableValue.refresh] or using [Parameter.setValue].
+     * 
+     * Singular state changes may be caused by performing some previously deferred lazy computations and
+     * using them as [WithHistory.undo]/[WithHistory.redo] unit would be misleading and inconvenient.
+     * So, [WithHistory.undo]/[WithHistory.redo] checkpoints are blocks of actions
+     * that start with explicit user actions described above and include all following implicit actions before next explicit one.
+     * 
+     * Even [Parameter] self-initialization causes a new checkpoint creation in history because otherwise the following [WithHistory.undo]
+     * would do different actions depending on the actual set value. However, no computations are performed in this case.
+     *
+     * @param recomputeEagerly Initializes [ComputationContext.WithHistory.recomputeEagerly] property.
+     */
     public class WithHistory public constructor(recomputeEagerly: Boolean = true) : ComputationContext(recomputeEagerly = recomputeEagerly) {
         
         private var index = 0
@@ -147,7 +185,12 @@ public open class ComputationContext public constructor(public override val reco
             operations.add(operation)
             index++
         }
-        
+
+        /**
+         * Moves to the previous checkpoint in history.
+         * 
+         * @throws IllegalArgumentException If there is no checkpoint before.
+         */
         public fun undo() {
             val operationsToUndo: Int? = run {
                 var result = 1
@@ -162,7 +205,12 @@ public open class ComputationContext public constructor(public override val reco
                 }
             }
         }
-        
+
+        /**
+         * Moves to the next checkpoint in history.
+         *
+         * @throws IllegalArgumentException If there is no checkpoint after.
+         */
         public fun redo() {
             val operationsToRedo: Int? = run {
                 if (index == operations.size) return@run null

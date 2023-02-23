@@ -1,6 +1,12 @@
+import contexts.AbstractComputationContext
+import contexts.ComputationContext
+import exceptions.NotInitializedException
+import exceptions.RecursiveComputationException
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
+import values.Computation
+import values.Parameter
 import java.lang.Exception
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -125,7 +131,7 @@ class ComputableValueTests {
     }
     
     @Test
-    fun recursion() = testComputationContexts {
+    fun recursion() = testComputationContexts { context ->
         var counter = 0
         var param by Parameter(100)
         val result by Computation { counter++; param + 1 }
@@ -142,7 +148,7 @@ class ComputableValueTests {
 
         val r = Recur()
         val exception = runCatching { r.x }.exceptionOrNull()
-        assertIs<RecursiveDependencyException>(exception)
+        assertIs<RecursiveComputationException>(exception)
         assertEquals(listOf(setOf("x"), setOf("y"), setOf("x")), exception.chain.map { it.names })
         assertEquals("Recursive chain: x => y => x", exception.message)
 
@@ -154,7 +160,7 @@ class ComputableValueTests {
         assertEquals(102, result)
         assertEquals(2, counter)
         
-        if (it is ComputationContext.WithHistory) with(it) {
+        if (context is ComputationContext.WithHistory) with(context) {
             undo()
 
             assertEquals(100, param)
