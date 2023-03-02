@@ -26,7 +26,7 @@ public class Computation<T> public constructor(vararg names: String, private val
         if (computeEagerly) result
     }
 
-    override fun computeResult(): Result<T> = withinStackScope { runCatching { generate() } }
+    override fun computeResult(): Result<T> = runCatching { withinStackScope { generate() } }
 
     override fun refresh() {
         openComputation()

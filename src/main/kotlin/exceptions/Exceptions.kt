@@ -24,7 +24,7 @@ public class IllegalComputationStateException internal constructor(override val 
  * @property chain Actual found cyclic computation chain that starts and finishes with the same [ComputableValue].
  * @property message [RecursiveComputationException.chain] in human-readable format.
  */
-public class RecursiveComputationException internal constructor(public val chain: List<ComputableValue<*>>): NotCaughtException() {
+public class RecursiveComputationException internal constructor(public val chain: List<ComputableValue<*>>): IllegalStateException() {
     override val message: String = chain.joinToString(" => ", prefix = "Recursive chain: ")
 }
 

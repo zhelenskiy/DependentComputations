@@ -100,7 +100,7 @@ Its simplified signature is
 
 Computing result and recomputing it when `refresh` is called or dependencies changed may be either eager or lazy. So, `computeEagerly` specifies the behaviour. Advantages of the lazy computing are elimination of useless computations and workaround of the delegate/object initialization order issue. Advantage of the eager computing is cutting off recursive computations when they are only caused.
 
-When recursive computation is found, a `RecursiveComputationException` is thrown. This exception cancels all changes that happened since last successful change. Depending on actual implementation of the recursion, another exception may occur, e.g. when you try to access not yet initialized property.
+When recursive computation is found, a `RecursiveComputationException` is thrown. Depending on actual implementation of the recursion, another exception may occur, e.g. when you try to access not yet initialized property.
 
 #### Example:
 
