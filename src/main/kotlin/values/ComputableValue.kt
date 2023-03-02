@@ -11,6 +11,7 @@ import states.WithValue
 import java.util.*
 import kotlin.reflect.KProperty
 import contexts.ComputationContext
+import kotlinx.collections.immutable.persistentSetOf
 
 /**
  * Marker annotation for [ComputableValue] DSL.
@@ -24,7 +25,7 @@ public annotation class ComputationDsl
  */
 context(AbstractComputationContext)
 @ComputationDsl
-public abstract class ComputableValue<T> internal constructor(initialState: ComputableValueState<T>, vararg names: String) {
+public abstract class ComputableValue<T> internal constructor(vararg names: String) {
     /**
      * Collected property names for [ComputableValue.toString].
      */
@@ -37,7 +38,7 @@ public abstract class ComputableValue<T> internal constructor(initialState: Comp
     override fun toString(): String {
         return if (names.isNotEmpty()) names.joinToString("/") else super.toString()
     }
-    internal var storedState: ComputableValueState<T> = initialState
+    internal var storedState: ComputableValueState<T> = NotInitialized(persistentSetOf(), persistentSetOf())
     internal var state: ComputableValueState<T>
         get() = getNodeState(this) ?: storedState
         set(value) = setNodeState(this, value)

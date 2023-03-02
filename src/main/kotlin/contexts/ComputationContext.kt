@@ -195,7 +195,11 @@ public open class ComputationContext public constructor(public override val reco
             val operationsToUndo: Int? = run {
                 var result = 1
                 while (index - result >= 0 && !operations[index - result].isCausedByUserAction) result++
-                result.takeIf { index - result >= 0 }
+                when {
+                    index - result >= 0 -> result
+                    result > 1 -> result - 1
+                    else -> null
+                }
             }
             require(operationsToUndo != null) { "Nothing to undo" }
             repeat(operationsToUndo) {

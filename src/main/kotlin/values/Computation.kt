@@ -2,8 +2,6 @@ package values
 
 import contexts.AbstractComputationContext
 import exceptions.IllegalComputationStateException
-import kotlinx.collections.immutable.persistentSetOf
-import states.NotInitialized
 
 
 /**
@@ -23,7 +21,7 @@ import states.NotInitialized
  */
 context (AbstractComputationContext)
 public class Computation<T> public constructor(vararg names: String, private val generate: () -> T) :
-    ComputableValue<T>(initialState = NotInitialized(persistentSetOf(), persistentSetOf()), *names) {
+    ComputableValue<T>(*names) {
     override fun computeResult(): Result<T> = withinStackScope { runCatching { generate() } }
 
     override fun refresh()  {

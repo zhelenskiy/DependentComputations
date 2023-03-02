@@ -13,6 +13,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 
+@Suppress("UNUSED_EXPRESSION")
 class ComputableValueTests {
     private fun testComputationContexts(f: context(AbstractComputationContext) (context: AbstractComputationContext) -> Unit) {
         ComputationContext(recomputeEagerly = true).let { f(it, it) }
@@ -216,10 +217,20 @@ class ComputableValueTests {
         assertEquals(100, result) // very old value
         assertEquals(3, counter) // does not recount
         
+        undo()
+        
+        assertThrows<NotInitializedException> { result }
+        assertThrows<NotInitializedException> { parameter }
+        
         runCatching { undo() }.exceptionOrNull().let {
             assertIs<IllegalArgumentException>(it)
             assertEquals("Nothing to undo", it.message)
         }
+
+        assertThrows<NotInitializedException> { result }
+        assertThrows<NotInitializedException> { parameter }
+        
+        redo()
 
         assertEquals(10, parameter) // very older value
         assertEquals(3, counter) // does not recount
@@ -305,7 +316,6 @@ class ComputableValueTests {
         assertThrows<IllegalArgumentException> { redo() }
     }
     
-    @Suppress("UNUSED_EXPRESSION")
     @Test
     fun recomputeHistory() = testComputationContextsWithHistory {
         var x by Parameter(5)
@@ -397,5 +407,16 @@ class ComputableValueTests {
         assertEquals(if (recomputeEagerly) 4 else 3, counter)
         assertEquals(12, result)
         assertEquals(4, counter)
+    }
+    
+    @Test
+    fun parameterInitializationUndoing() = testComputationContextsWithHistory {
+        val computed by Computation { 2 }
+        val parameter by Parameter(computed)
+        assertEquals(2, parameter)
+        undo()
+        assertThrows<NotInitializedException> { parameter }
+        undo()
+        assertThrows<NotInitializedException> { computed }
     }
 }
