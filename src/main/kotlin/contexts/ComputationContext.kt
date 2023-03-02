@@ -12,10 +12,10 @@ import values.Parameter
 /**
  * Inheritor of [AbstractComputationContext] that does not support history operations.
  * 
- * @param recomputeEagerly Initializes [ComputationContext.recomputeEagerly] property.
- * @property recomputeEagerly Implementation of [AbstractComputationContext.recomputeEagerly] property.
+ * @param computeEagerly Initializes [ComputationContext.computeEagerly] property.
+ * @property computeEagerly Implementation of [AbstractComputationContext.computeEagerly] property.
  */
-public open class ComputationContext public constructor(public override val recomputeEagerly: Boolean) : AbstractComputationContext() {
+public open class ComputationContext public constructor(public override val computeEagerly: Boolean) : AbstractComputationContext() {
     override var isCausedByUserAction: Boolean = false
         set(value) {
             if (value && !isInsideTransaction) throw IllegalComputationStateException("Cannot set cause beyond transaction")
@@ -160,9 +160,9 @@ public open class ComputationContext public constructor(public override val reco
      * Even [Parameter] self-initialization causes a new checkpoint creation in history because otherwise the following [WithHistory.undo] call
      * would do different actions depending on the actual set value. However, no computations are performed in this case.
      *
-     * @param recomputeEagerly Initializes [ComputationContext.WithHistory.recomputeEagerly] property.
+     * @param computeEagerly Initializes [ComputationContext.WithHistory.computeEagerly] property.
      */
-    public class WithHistory public constructor(recomputeEagerly: Boolean = true) : ComputationContext(recomputeEagerly = recomputeEagerly) {
+    public class WithHistory public constructor(computeEagerly: Boolean = true) : ComputationContext(computeEagerly = computeEagerly) {
         
         private var index = 0
         private class Operation(val isCausedByUserAction: Boolean, val changes: Map<ComputableValue<*>, Change>) {

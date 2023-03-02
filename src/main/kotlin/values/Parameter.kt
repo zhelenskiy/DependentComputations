@@ -51,7 +51,7 @@ public class Parameter<T> public constructor(value: T, vararg names: String) : C
      *
      * If new value is equal to the old one, dependents are not recomputed.
      *
-     * Eagerness of the recomputing of the dependent values is defined by [ComputationContext.recomputeEagerly].
+     * Eagerness of the recomputing of the dependent values is defined by [ComputationContext.computeEagerly].
      *
      * This operation drops the following history if [ComputationContext.isWatchingHistory] is true.
      *
@@ -70,7 +70,7 @@ public class Parameter<T> public constructor(value: T, vararg names: String) : C
             invalidateAllFromThis()
         }
         state = existingState
-        if (recomputeEagerly) {
+        if (computeEagerly) {
             for (dependent in state.dependents) {
                 dependent.result ?: throw IllegalComputationStateException("Refresh is caused by user")
             }

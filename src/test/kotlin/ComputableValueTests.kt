@@ -16,14 +16,14 @@ import kotlin.test.assertNull
 @Suppress("UNUSED_EXPRESSION")
 class ComputableValueTests {
     private fun testComputationContexts(f: context(AbstractComputationContext) (context: AbstractComputationContext) -> Unit) {
-        ComputationContext(recomputeEagerly = true).let { f(it, it) }
-        ComputationContext(recomputeEagerly = false).let { f(it, it) }
+        ComputationContext(computeEagerly = true).let { f(it, it) }
+        ComputationContext(computeEagerly = false).let { f(it, it) }
         testComputationContextsWithHistory(f)
     }
 
     private fun testComputationContextsWithHistory(f: context(ComputationContext.WithHistory) (context: AbstractComputationContext) -> Unit) {
-        ComputationContext.WithHistory(recomputeEagerly = true).let { f(it, it) }
-        ComputationContext.WithHistory(recomputeEagerly = false).let { f(it, it) }
+        ComputationContext.WithHistory(computeEagerly = true).let { f(it, it) }
+        ComputationContext.WithHistory(computeEagerly = false).let { f(it, it) }
     }
 
     @Test
@@ -38,7 +38,7 @@ class ComputableValueTests {
     fun independentComputation() = testComputationContexts {
         var counter = 0
         val value by Computation { counter++; 1 }
-        assertEquals(0, counter)
+        assertEquals(if (computeEagerly) 1 else 0, counter)
         assertEquals(1, value)
         assertEquals(1, counter)
         assertEquals(1, value)
@@ -46,7 +46,7 @@ class ComputableValueTests {
         
         val exception = Exception()
         val throwing by Computation<Int> { counter++; throw exception }
-        assertEquals(1, counter)
+        assertEquals(if (computeEagerly) 2 else 1, counter)
         assertEquals(exception, runCatching { throwing }.exceptionOrNull())
         assertEquals(2, counter)
         assertEquals(exception, runCatching { throwing }.exceptionOrNull())
@@ -59,13 +59,13 @@ class ComputableValueTests {
         var counter = 0
         var parameter by Parameter(10)
         val value by Computation { counter++; parameter }
-        assertEquals(0, counter)
+        assertEquals(if (computeEagerly) 1 else 0, counter)
         assertEquals(10, value)
         assertEquals(1, counter)
         assertEquals(10, value)
         assertEquals(1, counter)
         parameter++
-        assertEquals(if (recomputeEagerly) 2 else 1, counter)
+        assertEquals(if (computeEagerly) 2 else 1, counter)
         assertEquals(11, value)
         assertEquals(2, counter)
     }
@@ -77,11 +77,11 @@ class ComputableValueTests {
         var falseValue by Parameter(100)
         var condition by Parameter(true)
         val result by Computation { counter++; if (condition) trueValue else falseValue }
-        assertEquals(0, counter)
+        assertEquals(if (computeEagerly) 1 else 0, counter)
         assertEquals(1, trueValue)
         assertEquals(100, falseValue)
         assertEquals(true, condition)
-        assertEquals(0, counter)
+        assertEquals(if (computeEagerly) 1 else 0, counter)
         assertEquals(1, result)
         assertEquals(1, counter)
         
@@ -90,7 +90,7 @@ class ComputableValueTests {
         assertEquals(2, trueValue)
         assertEquals(100, falseValue)
         assertEquals(true, condition)
-        assertEquals(if (recomputeEagerly) 2 else 1, counter)
+        assertEquals(if (computeEagerly) 2 else 1, counter)
         assertEquals(2, result)
         assertEquals(2, counter) // changed: 1 -> 2
         
@@ -108,7 +108,7 @@ class ComputableValueTests {
         assertEquals(2, trueValue)
         assertEquals(101, falseValue)
         assertEquals(false, condition)
-        assertEquals(if (recomputeEagerly) 3 else 2, counter)
+        assertEquals(if (computeEagerly) 3 else 2, counter)
         assertEquals(101, result)
         assertEquals(3, counter) // changed: 2 -> 3
         
@@ -126,7 +126,7 @@ class ComputableValueTests {
         assertEquals(3, trueValue)
         assertEquals(102, falseValue)
         assertEquals(false, condition)
-        assertEquals(if (recomputeEagerly) 4 else 3, counter)
+        assertEquals(if (computeEagerly) 4 else 3, counter)
         assertEquals(102, result)
         assertEquals(4, counter) // changed: 3 -> 4
     }
@@ -138,26 +138,44 @@ class ComputableValueTests {
         val result by Computation { counter++; param + 1 }
         
         assertEquals(100, param)
-        assertEquals(0, counter)
+        assertEquals(if (computeEagerly) 1 else 0, counter)
         assertEquals(101, result)
         assertEquals(1, counter)
         
-        class Recur {
+        class Recur1 {
             val x by Computation { this.y }
             val y: Int by Computation { this.x }
         }
 
-        val r = Recur()
-        val exception = runCatching { r.x }.exceptionOrNull()
-        assertIs<RecursiveComputationException>(exception)
+        val r1 = Recur1()
+        val exception1 = runCatching { r1.x }.exceptionOrNull()
+        if (computeEagerly) {
+            assertIs<NullPointerException>(exception1, exception1?.stackTraceToString())
+        } else {
+            assertIs<RecursiveComputationException>(exception1, exception1?.stackTraceToString())
+            assertEquals(listOf(setOf("x"), setOf("y"), setOf("x")), exception1.chain.map { it.names })
+            assertEquals("Recursive chain: x => y => x", exception1.message)
+        }
+        
+        var condition2 by Parameter(false)
+        
+        class Recur2 {
+            val x by Computation { if (condition2) this.y else 0 }
+            val y: Int by Computation { if (condition2) this.x else 0 }
+        }
+
+        val r2 = Recur2()
+        val exception = runCatching { condition2 = true; r2.x }.exceptionOrNull()
+        assertIs<RecursiveComputationException>(exception, exception?.stackTraceToString())
         assertEquals(listOf(setOf("x"), setOf("y"), setOf("x")), exception.chain.map { it.names })
         assertEquals("Recursive chain: x => y => x", exception.message)
+        
 
         // Checking successful recovery
         param++
 
         assertEquals(101, param)
-        assertEquals(if (recomputeEagerly) 2 else 1, counter)
+        assertEquals(if (computeEagerly) 2 else 1, counter)
         assertEquals(102, result)
         assertEquals(2, counter)
         
@@ -185,21 +203,21 @@ class ComputableValueTests {
         val result by Computation { counter++; parameter * parameter }
         
         assertEquals(10, parameter)
-        assertEquals(0, counter)
+        assertEquals(if (computeEagerly) 1 else 0, counter)
         assertEquals(100, result)
         assertEquals(1, counter)
         
         parameter++ // change 1
 
         assertEquals(11, parameter)
-        assertEquals(if (recomputeEagerly) 2 else 1, counter)
+        assertEquals(if (computeEagerly) 2 else 1, counter)
         assertEquals(121, result)
         assertEquals(2, counter)
         
         parameter++ // change 2
 
         assertEquals(12, parameter)
-        assertEquals(if (recomputeEagerly) 3 else 2, counter)
+        assertEquals(if (computeEagerly) 3 else 2, counter)
         assertEquals(144, result)
         assertEquals(3, counter)
         
@@ -271,7 +289,7 @@ class ComputableValueTests {
         val result by delegate
 
         assertEquals(10, parameter)
-        assertEquals(0, counter)
+        assertEquals(if (computeEagerly) 1 else 0, counter)
         assertEquals(100, result)
         assertEquals(1, counter)
 
@@ -279,7 +297,7 @@ class ComputableValueTests {
 
         assertEquals(20, parameter)
         
-        assertEquals(if (recomputeEagerly) 2 else 1, counter)
+        assertEquals(if (computeEagerly) 2 else 1, counter)
         assertEquals(400, result)
         assertEquals(2, counter)
         
@@ -293,7 +311,7 @@ class ComputableValueTests {
         parameter = newValue
 
         assertEquals(newValue, parameter)
-        assertEquals(if (newValue == 10 || !recomputeEagerly) 2 else 3, counter)
+        assertEquals(if (newValue == 10 || !computeEagerly) 2 else 3, counter)
         assertEquals(newValue * newValue, result)
         assertEquals(if (newValue == 10) 2 else 3, counter)
         
@@ -310,7 +328,7 @@ class ComputableValueTests {
         delegate.refresh()
 
         assertEquals(10, parameter)
-        assertEquals(if (recomputeEagerly) 1 else 0, counter)
+        assertEquals(if (computeEagerly) 1 else 0, counter)
         assertEquals(100, result)
         assertEquals(1, counter)
         assertThrows<IllegalArgumentException> { redo() }
@@ -386,25 +404,25 @@ class ComputableValueTests {
         val c by Computation { parameterCopy + 2 }
         val result by Computation { counter++; b * c }
         
-        assertEquals(0, counter)
+        assertEquals(if (computeEagerly) 1 else 0, counter)
         assertEquals(6, result)
         assertEquals(1, counter)
         
         parameter++
 
-        assertEquals(if (recomputeEagerly) 2 else 1, counter)
+        assertEquals(if (computeEagerly) 2 else 1, counter)
         assertEquals(12, result)
         assertEquals(2, counter)
         
         parameterDelegate.refresh()
 
-        assertEquals(if (recomputeEagerly) 3 else 2, counter)
+        assertEquals(if (computeEagerly) 3 else 2, counter)
         assertEquals(12, result)
         assertEquals(3, counter)
         
         parameterDelegate.refresh()
 
-        assertEquals(if (recomputeEagerly) 4 else 3, counter)
+        assertEquals(if (computeEagerly) 4 else 3, counter)
         assertEquals(12, result)
         assertEquals(4, counter)
     }

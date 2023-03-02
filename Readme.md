@@ -96,16 +96,16 @@ Contexts are inherited from abstract `AbstractComputationContext`.
 ### `ComputationContext`
 
 Its simplified signature is
-`class ComputationContext(val recomputeEagerly: Boolean)`.
+`class ComputationContext(val computeEagerly: Boolean)`.
 
-Recomputing result when `refresh` is called and recomputing dependents when parameter changes may be either eager or lazy. So, `recomputeEagerly` specifies the behaviour. Advantage of the lazy recomputing is elimination of useless computations. Advantage of the eager recomputing is cutting off recursive computations when they are only caused.
+Computing result and recomputing it when `refresh` is called or dependencies changed may be either eager or lazy. So, `computeEagerly` specifies the behaviour. Advantages of the lazy computing are elimination of useless computations and workaround of the delegate/object initialization order issue. Advantage of the eager computing is cutting off recursive computations when they are only caused.
 
-When recursive computation is found, a `RecursiveComputationException` is thrown. This exception cancels all changes that happened since last successful change.
+When recursive computation is found, a `RecursiveComputationException` is thrown. This exception cancels all changes that happened since last successful change. Depending on actual implementation of the recursion, another exception may occur, e.g. when you try to access not yet initialized property.
 
 #### Example:
 
 ```kotlin
-with(ComputationContext(recomputeEagerly = true)) {
+with(ComputationContext(computeEagerly = true)) {
     val x by Parameter(2)
     val y by Parameter(3)
     val z by Computation { x * y }
@@ -118,7 +118,7 @@ with(ComputationContext(recomputeEagerly = true)) {
 ### `ComputationContext.WithHistory`
 
 Its simplified signature is
-`class WithHistory(val recomputeEagerly: Boolean)`. This is an inheritor of `ComputationContext` that supports watching history and operations `undo`, `redo` to move backward and forward in history correspondingly. `undo`, `redo` and watching historic values does not cause new computations.
+`class WithHistory(val computeEagerly: Boolean)`. This is an inheritor of `ComputationContext` that supports watching history and operations `undo`, `redo` to move backward and forward in history correspondingly. `undo`, `redo` and watching historic values does not cause new computations.
 
 `AbstractComputationContext` has property `isWatchingHistory` which returns `true` for `ComputationContext.WithHistory` if there are some actions to `redo`.
 
@@ -133,7 +133,7 @@ Even `Parameter` self-initialization causes a new checkpoint creation in history
 #### Examples:
 
 ```kotlin
-with(ComputationContext.WithHistory(recomputeEagerly = true)) {
+with(ComputationContext.WithHistory(computeEagerly = true)) {
     val x by Parameter(2)
     val y by Parameter(3)
     val z by Computation { x * y }
@@ -155,7 +155,7 @@ with(ComputationContext.WithHistory(recomputeEagerly = true)) {
 ```
 
 ```kotlin
-with(ComputationContext.WithHistory(recomputeEagerly = false)) {
+with(ComputationContext.WithHistory(computeEagerly = false)) {
     val x by Parameter(2)
     val y by Parameter(3)
     val z by Computation { x * y }
@@ -168,7 +168,7 @@ with(ComputationContext.WithHistory(recomputeEagerly = false)) {
     
     undo()
     println(y) // prints(3)
-    println(z) // falls with NotInitializedException because recomputeEagerly is false
+    println(z) // falls with NotInitializedException because computeEagerly is false
 }
 ```
 

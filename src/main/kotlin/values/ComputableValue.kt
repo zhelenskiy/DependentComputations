@@ -81,7 +81,7 @@ public abstract class ComputableValue<T> internal constructor(vararg names: Stri
                         throw notCaughtException
                     }
                     state = WithValue(state.dependents, state.dependencies, result)
-                    if (recomputeEagerly) {
+                    if (computeEagerly) {
                         this.state.dependents.forEach {
                             it.state = it.state.invalidated().casted
                         }
@@ -150,7 +150,7 @@ public abstract class ComputableValue<T> internal constructor(vararg names: Stri
      *
      * Parameter setter call is a checkpoint for [ComputationContext.WithHistory.undo] and [ComputationContext.WithHistory.redo].
      *
-     * Eagerness of the recomputing of the dependent values is defined by [ComputationContext.recomputeEagerly].
+     * Eagerness of the recomputing of the dependent values is defined by [ComputationContext.computeEagerly].
      *
      * This operation drops the following history if [ComputationContext.isWatchingHistory] is true.
      * 

@@ -16,7 +16,10 @@ public sealed class NotCaughtException: IllegalStateException()
 public class IllegalComputationStateException internal constructor(override val message: String?): NotCaughtException()
 
 /**
- * Exception that is thrown if cyclic computation chain is found.
+ * Exception that is thrown if lazy cyclic computation chain is found.
+ * 
+ * Eager cycles may fail with other exceptions such as [NullPointerException] because of access to not initialized delegate.
+ * The actual behaviour depends on the actual implementation of recursion.
  * 
  * @property chain Actual found cyclic computation chain that starts and finishes with the same [ComputableValue].
  * @property message [RecursiveComputationException.chain] in human-readable format.

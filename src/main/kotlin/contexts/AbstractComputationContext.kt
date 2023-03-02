@@ -20,14 +20,14 @@ public abstract class AbstractComputationContext internal constructor() {
     internal abstract fun <T> getNodeState(value: ComputableValue<T>): ComputableValueState<T>?
 
     /**
-     * Specifies strategy of recomputing values that depend on some value that has already changed.
+     * Specifies strategy of computing values and recomputing them when some dependency changes.
      * 
      * * When is true, dependent values are computed within the same transaction with dependency.
-     *   Its advantage is cutting off recursive dependencies together with their causes.
+     *   Its advantages are cutting off recursive dependencies together with their causes and workaround of the delegate/object initialization order issue.
      * * When is false, dependent values have no computed value until it is requested and generate it only on purpose.
      *   Its advantage is deferred computation that may be eliminated if it is not called anymore.
      */
-    public abstract val recomputeEagerly: Boolean
+    public abstract val computeEagerly: Boolean
 
     /**
      * Specifies whether [AbstractComputationContext] is watching history if it is supported by context, false otherwise.
