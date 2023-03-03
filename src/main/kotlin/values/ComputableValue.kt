@@ -100,13 +100,13 @@ public abstract class ComputableValue<T> internal constructor(vararg names: Stri
             state = state.invalidated()
         }
 
-        val visited = mutableSetOf<ComputableValue<*>>()
-        fun invalidateAllFromThisImpl(current: ComputableValue<*>) {
-            if (current in visited) return
-            visited.add(current)
-            current.invalidateCurrent()
-            for (dependent in current.state.dependents) {
-                invalidateAllFromThisImpl(dependent)
+        fun invalidateAllFromThisImpl(current: ComputableValue<*>): Unit = when (current.state) {
+            is NotInitialized -> {}
+            is WithValue -> {
+                current.invalidateCurrent()
+                for (dependent in current.state.dependents) {
+                    invalidateAllFromThisImpl(dependent)
+                }
             }
         }
         invalidateAllFromThisImpl(this)
