@@ -11,6 +11,7 @@ import states.WithValue
 import java.util.*
 import kotlin.reflect.KProperty
 import contexts.ComputationContext
+import exceptions.IllegalComputationStateException
 import kotlinx.collections.immutable.persistentSetOf
 
 /**
@@ -26,6 +27,8 @@ public annotation class ComputationDsl
 context(AbstractComputationContext)
 @ComputationDsl
 public abstract class ComputableValue<T> internal constructor(vararg names: String) {
+    protected abstract val computeEagerly: Boolean
+
     /**
      * Collected property names for [ComputableValue.toString].
      */
@@ -59,20 +62,26 @@ public abstract class ComputableValue<T> internal constructor(vararg names: Stri
      *   The new [Result] is cached.
      */
     public val result: Result<T>?
-        get() {
-            val mayRecompute = !isWatchingHistory || isCausedByUserAction
-            return when (val oldState = state) {
-                is NotInitialized -> if (mayRecompute) computeResultWithinStateMachine() else null
-                is WithValue -> {
-                    if (mayRecompute) {
-                        openComputation()
-                        currentNode?.let { this dependsOn it }
-                        closeComputation(successfully = true)
-                    }
-                    oldState.cachedValue
+        get() = when (val oldState = state) {
+            is NotInitialized -> if (mayRecompute) computeResultWithinStateMachine() else null
+            is WithValue -> {
+                if (mayRecompute) {
+                    openComputation()
+                    currentNode?.let { this dependsOn it }
+                    closeComputation(successfully = true)
                 }
+                oldState.cachedValue
             }
         }
+    
+    internal fun computeIfNotLazy() {
+        if (!computeEagerly) return
+        if (state !is NotInitialized) return
+        if (!mayRecompute) throw IllegalComputationStateException("Cannot compute value implicitly during watching history")
+        computeResultWithinStateMachine()
+    }
+
+    private val mayRecompute get() = !isWatchingHistory || isCausedByUserAction
 
     private fun computeResultWithinStateMachine(): Result<T> {
         openComputation()
@@ -150,7 +159,7 @@ public abstract class ComputableValue<T> internal constructor(vararg names: Stri
      *
      * Parameter setter call is a checkpoint for [ComputationContext.WithHistory.undo] and [ComputationContext.WithHistory.redo].
      *
-     * Eagerness of the recomputing of the dependent values is defined by [ComputationContext.computeEagerly].
+     * Eagerness of the recomputing of the dependent values is defined by [ComputationContext.computeEagerlyByDefault].
      *
      * This operation drops the following history if [ComputationContext.isWatchingHistory] is true.
      * 

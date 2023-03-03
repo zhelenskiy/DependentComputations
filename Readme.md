@@ -96,9 +96,9 @@ Contexts are inherited from abstract `AbstractComputationContext`.
 ### `ComputationContext`
 
 Its simplified signature is
-`class ComputationContext(val computeEagerly: Boolean)`.
+`class ComputationContext(val computeEagerlyByDefault: Boolean)`.
 
-Computing result and recomputing it when `refresh` is called or dependencies changed may be either eager or lazy. So, `computeEagerly` specifies the behaviour. Advantages of the lazy computing are elimination of useless computations and workaround of the delegate/object initialization order issue. Advantage of the eager computing is cutting off recursive computations when they are only caused.
+Computing result and recomputing it when `refresh` is called or dependencies changed may be either eager or lazy. So, `computeEagerlyByDefault` specifies the default behaviour. `Computation`s can change it. Advantages of the lazy computing are elimination of useless computations and workaround of the delegate/object initialization order issue. Advantage of the eager computing is cutting off recursive computations when they are only caused.
 
 When recursive computation is found, a `RecursiveComputationException` is thrown. Depending on actual implementation of the recursion, another exception may occur, e.g. when you try to access not yet initialized property.
 
@@ -118,7 +118,7 @@ with(ComputationContext(computeEagerly = true)) {
 ### `ComputationContext.WithHistory`
 
 Its simplified signature is
-`class WithHistory(val computeEagerly: Boolean)`. This is an inheritor of `ComputationContext` that supports watching history and operations `undo`, `redo` to move backward and forward in history correspondingly. `undo`, `redo` and watching historic values does not cause new computations.
+`class WithHistory(val computeEagerlyByDefault: Boolean)`. This is an inheritor of `ComputationContext` that supports watching history and operations `undo`, `redo` to move backward and forward in history correspondingly. `undo`, `redo` and watching historic values does not cause new computations.
 
 `AbstractComputationContext` has property `isWatchingHistory` which returns `true` for `ComputationContext.WithHistory` if there are some actions to `redo`.
 

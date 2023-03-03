@@ -1,7 +1,6 @@
 package values
 
 import contexts.AbstractComputationContext
-import exceptions.IllegalComputationStateException
 
 
 /**
@@ -18,12 +17,21 @@ import exceptions.IllegalComputationStateException
  *
  * @param names Already known initial names (see [ComputableValue.toString]) that may help to identify the instance.
  * @param generate The generator function for [ComputableValue.value] result.
+ * @param computeEagerly Override of [AbstractComputationContext.computeEagerlyByDefault] for this value or null otherwise.
  */
 context (AbstractComputationContext)
-public class Computation<T> public constructor(vararg names: String, private val generate: () -> T) :
-    ComputableValue<T>(*names) {
+public class Computation<T> public constructor(
+    vararg names: String,
+    computeEagerly: Boolean? = null,
+    private val generate: () -> T
+) : ComputableValue<T>(*names) {
+    /**
+     * Override of [AbstractComputationContext.computeEagerlyByDefault] for this value or default behaviour otherwise.
+     */
+    public override val computeEagerly: Boolean = computeEagerly ?: this@AbstractComputationContext.computeEagerlyByDefault
+
     init {
-        if (computeEagerly) result
+        computeIfNotLazy()
     }
 
     override fun computeResult(): Result<T> = runCatching { withinStackScope { generate() } }
@@ -34,9 +42,7 @@ public class Computation<T> public constructor(vararg names: String, private val
         withinStackScope {
             invalidateAllFromThis()
         }
-        if (computeEagerly) {
-            result ?: throw IllegalComputationStateException("Refresh is caused by user")
-        }
+        computeIfNotLazy()
         closeComputation(successfully = true)
     }
 }

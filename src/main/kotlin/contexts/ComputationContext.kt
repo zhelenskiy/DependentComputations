@@ -12,10 +12,10 @@ import values.Parameter
 /**
  * Inheritor of [AbstractComputationContext] that does not support history operations.
  * 
- * @param computeEagerly Initializes [ComputationContext.computeEagerly] property.
- * @property computeEagerly Implementation of [AbstractComputationContext.computeEagerly] property.
+ * @param computeEagerlyByDefault Initializes [ComputationContext.computeEagerlyByDefault] property.
+ * @property computeEagerlyByDefault Implementation of [AbstractComputationContext.computeEagerlyByDefault] property.
  */
-public open class ComputationContext public constructor(public override val computeEagerly: Boolean) : AbstractComputationContext() {
+public open class ComputationContext public constructor(public override val computeEagerlyByDefault: Boolean) : AbstractComputationContext() {
     override var isCausedByUserAction: Boolean = false
         set(value) {
             if (value && !isInsideTransaction) throw IllegalComputationStateException("Cannot set cause beyond transaction")
@@ -91,7 +91,7 @@ public open class ComputationContext public constructor(public override val comp
                     while (precommitTasks.isNotEmpty()) {
                         val first = precommitTasks.first()
                         precommitTasks.remove(first)
-                        first.result ?: throw IllegalComputationStateException("Refresh is caused by user")
+                        first.computeIfNotLazy()
                     }
                 } catch (e: NotCaughtException) {
                     closeComputation(successfully = false)
@@ -160,9 +160,9 @@ public open class ComputationContext public constructor(public override val comp
      * Even [Parameter] self-initialization causes a new checkpoint creation in history because otherwise the following [WithHistory.undo] call
      * would do different actions depending on the actual set value. However, no computations are performed in this case.
      *
-     * @param computeEagerly Initializes [ComputationContext.WithHistory.computeEagerly] property.
+     * @param computeEagerly Initializes [ComputationContext.WithHistory.computeEagerlyByDefault] property.
      */
-    public class WithHistory public constructor(computeEagerly: Boolean = true) : ComputationContext(computeEagerly = computeEagerly) {
+    public class WithHistory public constructor(computeEagerly: Boolean = true) : ComputationContext(computeEagerlyByDefault = computeEagerly) {
         
         private var index = 0
         private class Operation(val isCausedByUserAction: Boolean, val changes: Map<ComputableValue<*>, Change>) {
