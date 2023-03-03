@@ -27,7 +27,7 @@ public abstract class AbstractComputationContext internal constructor() {
      * * When is false, dependent values have no computed value until it is requested and generate it only on purpose.
      *   Its advantage is deferred computation that may be eliminated if it is not called anymore.
      */
-    public abstract val computeEagerly: Boolean
+    public abstract val computeEagerlyByDefault: Boolean
 
     /**
      * Specifies whether [AbstractComputationContext] is watching history if it is supported by context, false otherwise.

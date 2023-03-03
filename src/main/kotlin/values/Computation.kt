@@ -1,7 +1,6 @@
 package values
 
 import contexts.AbstractComputationContext
-import exceptions.IllegalComputationStateException
 
 
 /**
@@ -20,10 +19,13 @@ import exceptions.IllegalComputationStateException
  * @param generate The generator function for [ComputableValue.value] result.
  */
 context (AbstractComputationContext)
-public class Computation<T> public constructor(vararg names: String, private val generate: () -> T) :
-    ComputableValue<T>(*names) {
+public class Computation<T> public constructor(
+    vararg names: String,
+    public override val computeEagerly: Boolean = this@AbstractComputationContext.computeEagerlyByDefault,
+    private val generate: () -> T
+) : ComputableValue<T>(*names) {
     init {
-        if (computeEagerly) result
+        computeIfNotLazy()
     }
 
     override fun computeResult(): Result<T> = runCatching { withinStackScope { generate() } }
@@ -34,9 +36,7 @@ public class Computation<T> public constructor(vararg names: String, private val
         withinStackScope {
             invalidateAllFromThis()
         }
-        if (computeEagerly) {
-            result ?: throw IllegalComputationStateException("Refresh is caused by user")
-        }
+        computeIfNotLazy()
         closeComputation(successfully = true)
     }
 }

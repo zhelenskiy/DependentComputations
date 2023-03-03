@@ -2,7 +2,6 @@ package values
 
 import contexts.AbstractComputationContext
 import contexts.ComputationContext
-import exceptions.IllegalComputationStateException
 import states.WithValue
 import kotlin.reflect.KProperty
 
@@ -22,6 +21,8 @@ import kotlin.reflect.KProperty
  */
 context (AbstractComputationContext)
 public class Parameter<T> public constructor(value: T, vararg names: String) : ComputableValue<T>(*names) {
+    override val computeEagerly: Boolean
+        get() = true
     init {
         updateValue(value, force = true)
     }
@@ -51,7 +52,7 @@ public class Parameter<T> public constructor(value: T, vararg names: String) : C
      *
      * If new value is equal to the old one, dependents are not recomputed.
      *
-     * Eagerness of the recomputing of the dependent values is defined by [ComputationContext.computeEagerly].
+     * Eagerness of the recomputing of the dependent values is defined by [ComputationContext.computeEagerlyByDefault].
      *
      * This operation drops the following history if [ComputationContext.isWatchingHistory] is true.
      *
@@ -70,11 +71,9 @@ public class Parameter<T> public constructor(value: T, vararg names: String) : C
             invalidateAllFromThis()
         }
         state = existingState
-        if (computeEagerly) {
             for (dependent in state.dependents) {
-                dependent.result ?: throw IllegalComputationStateException("Refresh is caused by user")
+                dependent.computeIfNotLazy()
             }
-        }
         closeComputation(successfully = true)
     }
 }
