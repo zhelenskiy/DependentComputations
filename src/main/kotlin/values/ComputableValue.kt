@@ -59,41 +59,41 @@ public abstract class ComputableValue<T> internal constructor(vararg names: Stri
      *   The new [Result] is cached.
      */
     public val result: Result<T>?
-        get() = when (val oldState = state) {
-            is WithValue -> {
-                if (!isWatchingHistory || isCausedByUserAction) {
-                    openComputation()
-                    currentNode?.let { this dependsOn it }
-                    closeComputation(successfully = true)
-                }
-                oldState.cachedValue
-            }
-
-            is NotInitialized -> {
-                if (!isWatchingHistory || isCausedByUserAction) {
-                    openComputation()
-                    currentNode?.let { this dependsOn it }
-                    freeDependencies()
-                    val result = computeResult()
-                    val notCaughtException = result.exceptionOrNull() as? NotCaughtException
-                    if (notCaughtException != null) {
-                        closeComputation(successfully = false)
-                        throw notCaughtException
+        get() {
+            val mayRecompute = !isWatchingHistory || isCausedByUserAction
+            return when (val oldState = state) {
+                is NotInitialized -> if (mayRecompute) computeResultWithinStateMachine() else null
+                is WithValue -> {
+                    if (mayRecompute) {
+                        openComputation()
+                        currentNode?.let { this dependsOn it }
+                        closeComputation(successfully = true)
                     }
-                    state = WithValue(state.dependents, state.dependencies, result)
-                    if (computeEagerly) {
-                        this.state.dependents.forEach {
-                            it.state = it.state.invalidated().casted
-                        }
-                        precommitTasks.addAll(this.state.dependents)
-                    }
-                    closeComputation(successfully = true)
-                    result
-                } else {
-                    null
+                    oldState.cachedValue
                 }
             }
         }
+
+    private fun computeResultWithinStateMachine(): Result<T> {
+        openComputation()
+        currentNode?.let { this dependsOn it }
+        freeDependencies()
+        val result = computeResult()
+        val notCaughtException = result.exceptionOrNull() as? NotCaughtException
+        if (notCaughtException != null) {
+            closeComputation(successfully = false)
+            throw notCaughtException
+        }
+        state = WithValue(state.dependents, state.dependencies, result)
+        if (computeEagerly) {
+            this.state.dependents.forEach {
+                it.state = it.state.invalidated().casted
+            }
+            precommitTasks.addAll(this.state.dependents)
+        }
+        closeComputation(successfully = true)
+        return result
+    }
 
     internal fun invalidateAllFromThis() {
         fun <T> ComputableValue<T>.invalidateCurrent() {
