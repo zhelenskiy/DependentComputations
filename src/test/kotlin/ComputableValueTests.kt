@@ -5,9 +5,10 @@ import exceptions.RecursiveComputationException
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
+import values.ComputableValue
 import values.Computation
 import values.Parameter
-import java.lang.Exception
+import kotlin.reflect.KProperty
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -457,5 +458,20 @@ class ComputableValueTests {
         assertEquals(if (eager) 3 else 2, counter)
         assertEquals(100, value)
         assertEquals(3, counter)
+    }
+    
+    @Test
+    fun logging() = testComputationContexts {
+        val logger = StringBuilder()
+        val original = Computation { "Hi!" }
+        val modifiedParameter: ComputableValue<String> = object : ComputableValue<String> by original {
+            override fun getValue(thisRef: Any?, property: KProperty<*>): String {
+                return original.getValue(thisRef, property).also { logger.appendLine("$this retrieved value: $it") }
+            }
+        }
+        val variable by modifiedParameter
+        assertEquals("Hi!", variable)
+        assertEquals("Hi!", variable)
+        assertEquals("variable retrieved value: Hi!\n".repeat(2), logger.toString())
     }
 }

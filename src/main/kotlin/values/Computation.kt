@@ -23,8 +23,8 @@ context (AbstractComputationContext)
 public class Computation<T> public constructor(
     vararg names: String,
     computeEagerly: Boolean? = null,
-    private val generate: () -> T
-) : ComputableValue<T>(*names) {
+    private val generate: () -> T,
+) : PrimitiveComputableValue<T>(*names) {
     /**
      * Override of [AbstractComputationContext.computeEagerlyByDefault] for this value or default behaviour otherwise.
      */

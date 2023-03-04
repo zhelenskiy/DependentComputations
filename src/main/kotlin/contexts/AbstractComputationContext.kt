@@ -2,6 +2,7 @@ package contexts
 
 import values.ComputableValue
 import states.ComputableValueState
+import values.PrimitiveComputableValue
 import values.Computation
 
 /**
@@ -11,14 +12,14 @@ import values.Computation
  */
 public abstract class AbstractComputationContext internal constructor() {
     internal abstract fun commit()
-    internal abstract val newStates: MutableMap<ComputableValue<*>, ComputableValueState<*>>
-    internal abstract val currentNode: ComputableValue<*>?
-    internal abstract fun <T> ComputableValue<*>.withinStackScope(f: () -> T): T
+    internal abstract val newStates: MutableMap<PrimitiveComputableValue<*>, ComputableValueState<*>>
+    internal abstract val currentNode: PrimitiveComputableValue<*>?
+    internal abstract fun <T> PrimitiveComputableValue<*>.withinStackScope(f: () -> T): T
     internal abstract fun openComputation()
-    internal abstract val precommitTasks: MutableSet<ComputableValue<*>>
+    internal abstract val precommitTasks: MutableSet<PrimitiveComputableValue<*>>
     internal abstract fun closeComputation(successfully: Boolean)
-    internal abstract fun setNodeState(value: ComputableValue<*>, newState: ComputableValueState<*>)
-    internal abstract fun <T> getNodeState(value: ComputableValue<T>): ComputableValueState<T>?
+    internal abstract fun setNodeState(value: PrimitiveComputableValue<*>, newState: ComputableValueState<*>)
+    internal abstract fun <T> getNodeState(value: PrimitiveComputableValue<T>): ComputableValueState<T>?
 
     /**
      * Specifies default strategy of computing values and recomputing them when some dependency changes.

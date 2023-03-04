@@ -8,6 +8,7 @@ import exceptions.NotCaughtException
 import exceptions.RecursiveComputationException
 import exceptions.NotInitializedException
 import values.Parameter
+import values.PrimitiveComputableValue
 
 /**
  * Inheritor of [AbstractComputationContext] that does not support history operations.
@@ -22,17 +23,17 @@ public open class ComputationContext public constructor(public override val comp
             field = value
         }
     
-    override val newStates = mutableMapOf<ComputableValue<*>, ComputableValueState<*>>()
+    override val newStates = mutableMapOf<PrimitiveComputableValue<*>, ComputableValueState<*>>()
     private var openedComputations: Long = 0L
     private val isInsideTransaction: Boolean
         get() = openedComputations > 0L
     
     private class Stack {
-        private val stack = mutableListOf<ComputableValue<*>>()
-        private val stackContent = mutableListOf<ComputableValue<*>>()
+        private val stack = mutableListOf<PrimitiveComputableValue<*>>()
+        private val stackContent = mutableListOf<PrimitiveComputableValue<*>>()
 
         @Throws(RecursiveComputationException::class)
-        fun push(element: ComputableValue<*>) {
+        fun push(element: PrimitiveComputableValue<*>) {
             if (stackContent.contains(element)) {
                 val chain = buildList {
                     add(element)
@@ -51,7 +52,7 @@ public open class ComputationContext public constructor(public override val comp
             stackContent.remove(stack.removeLast())
         }
         
-        fun peek(): ComputableValue<*>? = stack.lastOrNull()
+        fun peek(): PrimitiveComputableValue<*>? = stack.lastOrNull()
         
         fun clear() {
             stack.clear()
@@ -63,10 +64,10 @@ public open class ComputationContext public constructor(public override val comp
     }
     private val stack = Stack()
     
-    override val currentNode: ComputableValue<*>?
+    override val currentNode: PrimitiveComputableValue<*>?
         get() = stack.peek()
     
-    override fun <T> ComputableValue<*>.withinStackScope(f: () -> T): T {
+    override fun <T> PrimitiveComputableValue<*>.withinStackScope(f: () -> T): T {
         stack.push(this)
         return try {
             f()
@@ -81,7 +82,7 @@ public open class ComputationContext public constructor(public override val comp
         openedComputations++
     }
     
-    override val precommitTasks: MutableSet<ComputableValue<*>> = mutableSetOf()
+    override val precommitTasks: MutableSet<PrimitiveComputableValue<*>> = mutableSetOf()
     
     override fun closeComputation(successfully: Boolean) {
         if (!isInsideTransaction) return
@@ -128,7 +129,7 @@ public open class ComputationContext public constructor(public override val comp
         isCausedByUserAction = false
     }
 
-    override fun setNodeState(value: ComputableValue<*>, newState: ComputableValueState<*>) {
+    override fun setNodeState(value: PrimitiveComputableValue<*>, newState: ComputableValueState<*>) {
         when {
             !isInsideTransaction -> throw IllegalComputationStateException("Cannot change beyond transaction")
             value.storedState == newState -> newStates.remove(value)
@@ -136,7 +137,7 @@ public open class ComputationContext public constructor(public override val comp
         }
     }
     
-    override fun <T> getNodeState(value: ComputableValue<T>): ComputableValueState<T>? =
+    override fun <T> getNodeState(value: PrimitiveComputableValue<T>): ComputableValueState<T>? =
         newStates[value]?.casted
 
     override val isWatchingHistory: Boolean
@@ -165,7 +166,7 @@ public open class ComputationContext public constructor(public override val comp
     public class WithHistory public constructor(computeEagerly: Boolean = true) : ComputationContext(computeEagerlyByDefault = computeEagerly) {
         
         private var index = 0
-        private class Operation(val isCausedByUserAction: Boolean, val changes: Map<ComputableValue<*>, Change>) {
+        private class Operation(val isCausedByUserAction: Boolean, val changes: Map<PrimitiveComputableValue<*>, Change>) {
             data class Change(val oldState: ComputableValueState<*>, val newState: ComputableValueState<*>)
         }
         private val operations = mutableListOf<Operation>()

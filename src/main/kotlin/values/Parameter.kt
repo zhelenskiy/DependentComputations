@@ -20,7 +20,7 @@ import kotlin.reflect.KProperty
  * @param names Already known initial names (see [ComputableValue.toString]) that may help to identify the instance.
  */
 context (AbstractComputationContext)
-public class Parameter<T> public constructor(value: T, vararg names: String) : ComputableValue<T>(*names) {
+public class Parameter<T> public constructor(value: T, vararg names: String) : PrimitiveComputableValue<T>(*names), MutableComputableValue<T> {
     override val computeEagerly: Boolean
         get() = true
     init {
@@ -58,7 +58,7 @@ public class Parameter<T> public constructor(value: T, vararg names: String) : C
      *
      * @see ComputationContext.WithHistory
      */
-    public operator fun setValue(thisRef: Any?, property: KProperty<*>, value: T) {
+    override operator fun setValue(thisRef: Any?, property: KProperty<*>, value: T) {
         namesImpl.add(property.name)
         updateValue(value, force = false)
     }
