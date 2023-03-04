@@ -474,4 +474,51 @@ class ComputableValueTests {
         assertEquals("Hi!", variable)
         assertEquals("variable retrieved value: Hi!\n".repeat(2), logger.toString())
     }
+    
+    context(AbstractComputationContext)
+    @Suppress("SameParameterValue")
+    private fun <T> segmentTree(items: Array<Parameter<T>>, neutral: T, operation: (T, T) -> T): (IntRange) -> T {
+        val n = items.size
+        @Suppress("UNCHECKED_CAST")
+        val segmentTreeImpl = arrayOfNulls<ComputableValue<T>>(2 * n - 1).apply {
+            for (i in items.indices) {
+                set(i + n - 1, items[i])
+            }
+            for (i in (n - 2) downTo 0) {
+                set(i, Computation { operation(get(2 * i + 1)!!.value, get(2 * i + 2)!!.value) })
+            }
+        } as Array<ComputableValue<T>>
+        return {
+            val queryL = it.first
+            val queryR = it.last + 1
+            fun query(self: Int, selfL: Int, selfR: Int): T {
+                if (queryL <= selfL && queryR >= selfR) return segmentTreeImpl[self].value
+                if (queryR <= selfL || queryL >= selfR) return neutral
+                val mid = (selfL + selfR) / 2
+                return operation(query(self * 2 + 1, selfL, mid), query(self * 2 + 2, mid, selfR))
+            }
+            query(0, 0, n)
+        }
+    }
+    
+    @Test
+    fun segmentTree() = testComputationContexts {
+        val values = Array(4) { it + 1 }
+        val parameters = Array(4) { Parameter(values[it]) }
+        val query = segmentTree(parameters, 0) { a, b -> a + b }
+        fun check() {
+            for (i in 0..3) {
+                for (j in i..3) {
+                    assertEquals(values.slice(i..j).sum(), query(i..j), "$i..$j")
+                }
+            }
+        }
+        check()
+        for (i in values.indices) {
+            values[i] *= -1
+            var parameter by parameters[i]
+            parameter *= -1
+            check()
+        }
+    }
 }

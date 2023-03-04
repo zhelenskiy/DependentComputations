@@ -71,9 +71,9 @@ public class Parameter<T> public constructor(value: T, vararg names: String) : P
             invalidateAllFromThis()
         }
         state = existingState
-            for (dependent in state.dependents) {
-                dependent.computeIfNotLazy()
-            }
+        for (dependent in state.dependents) {
+            dependent.computeIfNotLazy()
+        }
         closeComputation(successfully = true)
     }
 }
