@@ -1,5 +1,6 @@
 import contexts.AbstractComputationContext
 import contexts.ComputationContext
+import contexts.transaction
 import exceptions.NotInitializedException
 import exceptions.RecursiveComputationException
 import org.junit.jupiter.api.assertThrows
@@ -520,5 +521,26 @@ class ComputableValueTests {
             parameter *= -1
             check()
         }
+    }
+    
+    @Test
+    fun transaction() = testComputationContexts {
+        var counter = 0
+        val parameterDelegate = Parameter(0)
+        var parameter by parameterDelegate
+        val computationDelegate = Computation { counter++; parameter }
+        val computation by computationDelegate
+        assertEquals(0, computation)
+        assertEquals(1, counter)
+        transaction {
+            parameter++
+            parameter++
+            computationDelegate.refresh()
+            computationDelegate.refresh()
+            parameterDelegate.refresh()
+            parameterDelegate.refresh()
+        }
+        assertEquals(2, computation)
+        assertEquals(2, counter)
     }
 }

@@ -1,6 +1,7 @@
 package values
 
 import contexts.AbstractComputationContext
+import contexts.transaction
 
 
 /**
@@ -36,13 +37,11 @@ public class Computation<T> public constructor(
 
     override fun computeResult(): Result<T> = runCatching { withinStackScope { generate() } }
 
-    override fun refresh() {
-        openComputation()
+    override fun refresh(): Unit = transaction {
         isCausedByUserAction = true
         withinStackScope {
             invalidateAllFromThis()
         }
-        computeIfNotLazy()
-        closeComputation(successfully = true)
+        precommitTasks.add(this)
     }
 }

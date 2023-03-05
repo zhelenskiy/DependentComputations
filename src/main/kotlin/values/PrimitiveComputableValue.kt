@@ -1,6 +1,7 @@
 package values
 
 import contexts.AbstractComputationContext
+import contexts.transaction
 import exceptions.IllegalComputationStateException
 import exceptions.NotCaughtException
 import exceptions.NotInitializedException
@@ -41,9 +42,7 @@ public abstract class PrimitiveComputableValue<T> internal constructor(vararg na
             is NotInitialized -> if (mayRecompute) computeResultWithinStateMachine() else null
             is WithValue -> {
                 if (mayRecompute) {
-                    openComputation()
-                    currentNode?.let { this dependsOn it }
-                    closeComputation(successfully = true)
+                    transaction { currentNode?.let { this dependsOn it } }
                 }
                 oldState.cachedValue
             }

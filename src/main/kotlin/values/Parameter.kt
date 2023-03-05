@@ -2,6 +2,7 @@ package values
 
 import contexts.AbstractComputationContext
 import contexts.ComputationContext
+import contexts.transaction
 import states.WithValue
 import kotlin.reflect.KProperty
 
@@ -29,8 +30,7 @@ public class Parameter<T> public constructor(value: T, vararg names: String) : P
 
     override fun computeResult(): Result<T> = (state as WithValue<T>).cachedValue
 
-    private fun updateValue(value: T, force: Boolean) {
-        openComputation()
+    private fun updateValue(value: T, force: Boolean) = transaction {
         isCausedByUserAction = true
         if (force || value != this.value) {
             state = WithValue(
@@ -40,7 +40,6 @@ public class Parameter<T> public constructor(value: T, vararg names: String) : P
             )
             refresh()
         }
-        closeComputation(successfully = true)
     }
 
     /**
@@ -63,8 +62,7 @@ public class Parameter<T> public constructor(value: T, vararg names: String) : P
         updateValue(value, force = false)
     }
 
-    override fun refresh() {
-        openComputation()
+    override fun refresh(): Unit = transaction {
         isCausedByUserAction = true
         val existingState = state
         withinStackScope {
@@ -72,8 +70,7 @@ public class Parameter<T> public constructor(value: T, vararg names: String) : P
         }
         state = existingState
         for (dependent in state.dependents) {
-            dependent.computeIfNotLazy()
+            precommitTasks.add(dependent)
         }
-        closeComputation(successfully = true)
     }
 }

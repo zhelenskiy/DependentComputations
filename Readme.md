@@ -172,6 +172,22 @@ with(ComputationContext.WithHistory(computeEagerly = false)) {
 }
 ```
 
+### Transaction
+
+Function `transaction` allows to deffer several updates of dependents to the end of transaction (when possible) and behave as one big atomic action. If there are nested transactions, the most outer is considered as the only transaction then.
+
+#### Example:
+```kotlin
+var parameter by parameterDelegate
+val computation by Computation { parameter }
+transaction {
+    parameter++
+    // computation is NOT recomputed
+    parameter++
+    // computation is NOT recomputed
+} // computation IS recomputed ONCE during exit from transaction
+```
+
 ## Known issues
 
 Interaction with other variables cannot be done from different threads. This limitation will be removed not earlier than Kotlin property delegates with context receivers will take receivers from call-site but not from delegate creation site as now.
